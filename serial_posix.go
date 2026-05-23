@@ -14,7 +14,7 @@ import (
 	"os"
 	"syscall"
 	"time"
-	//"unsafe"
+	"unsafe"
 )
 
 func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration) (p *Port, err error) {
@@ -194,4 +194,46 @@ func (p *Port) Flush() error {
 
 func (p *Port) Close() (err error) {
 	return p.f.Close()
+}
+
+// Fd returns the underlying file descriptor for the serial port.
+func (p *Port) Fd() uintptr {
+	return p.f.Fd()
+}
+
+// SetDTR sets the Data Terminal Ready signal.
+func (p *Port) SetDTR(v bool) error {
+	return setModemBitCgo(C.int(p.f.Fd()), C.TIOCM_DTR, v)
+}
+
+// SetRTS sets the Request To Send signal.
+func (p *Port) SetRTS(v bool) error {
+	return setModemBitCgo(C.int(p.f.Fd()), C.TIOCM_RTS, v)
+}
+
+// ResetInputBuffer discards data received but not read from the input buffer.
+func (p *Port) ResetInputBuffer() error {
+	_, err := C.tcflush(C.int(p.f.Fd()), C.TCIFLUSH)
+	return err
+}
+
+// ResetOutputBuffer discards data written but not transmitted from the output buffer.
+func (p *Port) ResetOutputBuffer() error {
+	_, err := C.tcflush(C.int(p.f.Fd()), C.TCOFLUSH)
+	return err
+}
+
+func setModemBitCgo(fd C.int, bit C.int, v bool) error {
+	var status C.int
+	_, err := C.ioctl(fd, C.TIOCMGET, unsafe.Pointer(&status))
+	if err != nil {
+		return err
+	}
+	if v {
+		status |= bit
+	} else {
+		status &^= bit
+	}
+	_, err = C.ioctl(fd, C.TIOCMSET, unsafe.Pointer(&status))
+	return err
 }

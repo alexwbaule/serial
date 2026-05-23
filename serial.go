@@ -108,9 +108,13 @@ type Config struct {
 	// Number of stop bits to use. Default is 1 (1 stop bit).
 	StopBits StopBits
 
-	// RTSFlowControl bool
-	// DTRFlowControl bool
-	// XONFlowControl bool
+	// InitialDTR controls the DTR signal right after the port is opened.
+	// nil means no change (OS default). Use Bool(true) or Bool(false) to set.
+	InitialDTR *bool
+
+	// InitialRTS controls the RTS signal right after the port is opened.
+	// nil means no change (OS default). Use Bool(true) or Bool(false) to set.
+	InitialRTS *bool
 
 	// CRLFTranslate bool
 }
@@ -136,8 +140,31 @@ func OpenPort(c *Config) (*Port, error) {
 	if stop == 0 {
 		stop = Stop1
 	}
-	return openPort(c.Name, c.Baud, size, par, stop, c.ReadTimeout)
+	p, err := openPort(c.Name, c.Baud, size, par, stop, c.ReadTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply initial DTR/RTS settings after port is opened.
+	// This matches Python's serial.Serial(dsrdtr=False) followed by port.dtr = True.
+	if c.InitialDTR != nil {
+		if err := p.SetDTR(*c.InitialDTR); err != nil {
+			p.Close()
+			return nil, err
+		}
+	}
+	if c.InitialRTS != nil {
+		if err := p.SetRTS(*c.InitialRTS); err != nil {
+			p.Close()
+			return nil, err
+		}
+	}
+
+	return p, nil
 }
+
+// Bool is a helper to create a *bool for Config fields.
+func Bool(v bool) *bool { return &v }
 
 // Converts the timeout values for Linux / POSIX systems
 func posixTimeoutValues(readTimeout time.Duration) (vmin uint8, vtime uint8) {

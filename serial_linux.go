@@ -162,3 +162,67 @@ func (p *Port) Flush() error {
 func (p *Port) Close() (err error) {
 	return p.f.Close()
 }
+
+// Fd returns the underlying file descriptor for the serial port.
+func (p *Port) Fd() uintptr {
+	return p.f.Fd()
+}
+
+// SetDTR sets the Data Terminal Ready signal.
+func (p *Port) SetDTR(v bool) error {
+	return setModemBit(p.f.Fd(), unix.TIOCM_DTR, v)
+}
+
+// SetRTS sets the Request To Send signal.
+func (p *Port) SetRTS(v bool) error {
+	return setModemBit(p.f.Fd(), unix.TIOCM_RTS, v)
+}
+
+// ResetInputBuffer discards data received but not read from the input buffer.
+func (p *Port) ResetInputBuffer() error {
+	const TCFLSH = 0x540B
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		p.f.Fd(),
+		uintptr(TCFLSH),
+		uintptr(unix.TCIFLUSH),
+	)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+// ResetOutputBuffer discards data written but not transmitted from the output buffer.
+func (p *Port) ResetOutputBuffer() error {
+	const TCFLSH = 0x540B
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		p.f.Fd(),
+		uintptr(TCFLSH),
+		uintptr(unix.TCOFLUSH),
+	)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+// setModemBit sets or clears a single modem-control bit (DTR or RTS).
+func setModemBit(fd uintptr, bit uint, v bool) error {
+	var status int
+	_, _, errno := unix.Syscall(unix.SYS_IOCTL, fd, uintptr(unix.TIOCMGET), uintptr(unsafe.Pointer(&status)))
+	if errno != 0 {
+		return errno
+	}
+	if v {
+		status |= int(bit)
+	} else {
+		status &^= int(bit)
+	}
+	_, _, errno = unix.Syscall(unix.SYS_IOCTL, fd, uintptr(unix.TIOCMSET), uintptr(unsafe.Pointer(&status)))
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
