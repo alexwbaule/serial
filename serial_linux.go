@@ -11,6 +11,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const fionread = 0x541B
+
 func openPort(name string, baud int, databits byte, parity Parity, stopbits StopBits, readTimeout time.Duration) (p *Port, err error) {
 	var bauds = map[int]uint32{
 		50:      unix.B50,
