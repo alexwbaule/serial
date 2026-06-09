@@ -217,7 +217,7 @@ func (p *Port) BytesAvailable() (int, error) {
       _, _, errno := unix.Syscall(
               unix.SYS_IOCTL,
               p.f.Fd(),
-              uintptr(unix.FIONREAD),
+              uintptr(fionread),
               uintptr(unsafe.Pointer(&n)),
       )
       if errno != 0 {
