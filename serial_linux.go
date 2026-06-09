@@ -226,6 +226,29 @@ func (p *Port) BytesAvailable() (int, error) {
       return int(n), nil
 }
 
+// SetReadTimeout changes the read timeout on the open port.
+// Useful for short-timeout drain loops. Restore to the original
+// value after draining.
+func (p *Port) SetReadTimeout(timeout time.Duration) error {
+    var t unix.Termios
+    if _, _, errno := unix.Syscall6(
+        unix.SYS_IOCTL, p.f.Fd(), unix.TCGETS,
+        uintptr(unsafe.Pointer(&t)), 0, 0, 0,
+    ); errno != 0 {
+        return errno
+    }
+    vmin, vtime := posixTimeoutValues(timeout)
+    t.Cc[unix.VMIN] = vmin
+    t.Cc[unix.VTIME] = vtime
+    if _, _, errno := unix.Syscall6(
+        unix.SYS_IOCTL, p.f.Fd(), unix.TCSETS,
+        uintptr(unsafe.Pointer(&t)), 0, 0, 0,
+    ); errno != 0 {
+        return errno
+    }
+    return nil
+}
+
 // setModemBit sets or clears a single modem-control bit (DTR or RTS).
 func setModemBit(fd uintptr, bit uint, v bool) error {
 	var status int
