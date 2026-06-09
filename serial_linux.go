@@ -208,6 +208,22 @@ func (p *Port) ResetOutputBuffer() error {
 	return nil
 }
 
+// BytesAvailable returns the number of bytes in the OS receive buffer
+// without blocking. Safe to call at any time.
+func (p *Port) BytesAvailable() (int, error) {
+      var n int32
+      _, _, errno := unix.Syscall(
+              unix.SYS_IOCTL,
+              p.f.Fd(),
+              uintptr(unix.FIONREAD),
+              uintptr(unsafe.Pointer(&n)),
+      )
+      if errno != 0 {
+              return 0, errno
+      }
+      return int(n), nil
+}
+
 // setModemBit sets or clears a single modem-control bit (DTR or RTS).
 func setModemBit(fd uintptr, bit uint, v bool) error {
 	var status int
